@@ -15,6 +15,11 @@
 #ponz_pointz h2 {
   margin: 5px;
 }
+#yourPonzverts {
+  border: 0.5px solid black;
+  border-radius: 5px;
+  padding:5px;
+}
 
 #main {
   margin: 5px;
@@ -22,4 +27,47 @@
 
 #main div {
   margin-bottom: 10px;
+}
+
+.ponz-mem div {
+  margin-left:10px;
+}
+
+.displayName {
+  font-weight:bold;
+  font-size:15px;
+  display:inline;
+}
+
+.ponz-pointz-box {
+  background-color: green;
+  border-radius:2px;
+  display:inline;
+  color:white;
+  font-weight:bold;
+  font-size:10px;
+  padding-left: 2px;
+  padding-right: 2px;
+  padding-bottom: 1px;
+  padding-top: 1px;
+}
+
+#chain-of-opportunity {
+  margin: 0 auto;
+  margin-top:20px;
+  width: 0;
+  height: 0;
+  border-left: 200px solid black;
+  border-right: 200px solid black;
+  border-bottom: 200px solid transparent;
+  z-index:2;
+}
+
+#level {
+  position:absolute;
+  width: 100%;
+  height:20%;
+  background-color:blue;
+  border: 2px solid black;
+  z-index:-1;
 }

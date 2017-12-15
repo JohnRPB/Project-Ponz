@@ -130,32 +130,90 @@ passport.deserializeUser(function(id, done) {
 //Build Redis Tree Section
 //Only do if tree in redis does not exist
 //--------------------------------------
+class TreeController {
+  constructor() {
+    this.tree;
+  }
 
-let recurseTree = async(user) => {
-  user.children = await Promise.all(user.children.map(async(child) => {
-    let fullChild = await User.findById(child, { _id: 1, children: 1 });
-    if (fullChild.children.length > 0) {
-      await recurseTree(fullChild);
+  getChildById(node, searchId) {
+    if (node._id.toString() === searchId) {
+      console.log(node);
+      return node;
+    } else {
+      let foundChild;
+      for (var i = 0, len = node.children.length; i < len; i++) {
+        foundChild = node.children[i]; 
+        const result = this.getChildById(foundChild, searchId);
+        if (result) {
+          return result;
+        }
+      }
     }
-    return fullChild
+  }
+  countChildrenByLevel(node) {
+    let returnArr = [];
+    this._countLevel(node, 0, returnArr);
+    return returnArr;
+  }
 
-  }))
+  _countLevel(node, level, returnArr) {
+    if (node.children.length > 0) {
+      if (returnArr[level]) {
+        returnArr[level] += node.children.length;
+      } else {
+        returnArr[level] = node.children.length;
+      }
+      node.children.forEach((child) => {
+        return this._countLevel(child, level+1, returnArr);
+      });
+    } 
+    return 0;
+  }
 
+  updateChild(newChild) {
+    let oldChild = this.getChildById(this.tree, newChild._id)
+    oldChild = newChild;
+  }
+
+  returnTree() {
+    return this.tree;
+  }
+
+  addChild(newChild) {
+    this.getChildById(this.tree, newChild.parent).children.push(newChild);
+  }
+
+  async updateTree() {
+    redisClient.set('tree', JSON.stringify(this.tree));
+  }
+
+  async buildTree() {
+    this.tree = { _id: "", children: [] };
+    this.tree.children = await User.find({ parent: null }, { _id: 1, children: 1 }); // returns array
+    await this._recurseTree(this.tree);
+  }
+
+  async _recurseTree(user) {
+    user.children = await Promise.all(user.children.map(async(child) => {
+    let fullChild = await User.findById(child, {});
+      if (fullChild.children.length > 0) {
+        await this._recurseTree(fullChild);
+      }
+      return fullChild
+    }))
+  }
 }
 
-let buildTree = async() => {
-  let tree = { id: null, children: [] };
-  tree.children = await User.find({ parent: null }, { _id: 1, children: 1 }); // returns array
-  await recurseTree(tree);
-  return tree
-}
-
-buildTree().then(tree => {
-  console.log(JSON.stringify(tree, null, 2));
-  //-----------------
-  //Save tree to redis here
-  //-------------------
-});
+let tree = new TreeController();
+//tree.buildTree().then(() => {
+  //let model = tree.returnTree();
+  //console.log(JSON.stringify(model, null, 2));
+  //console.log("tree.getChildById: ", tree.getChildById);
+  //console.log(tree.getChildById(model, "5a3186e3a6000e630dd5bd92"));
+  ////-----------------
+  ////Save tree to redis here
+  ////-------------------
+//});
 
 
 
@@ -177,10 +235,13 @@ buildTree().then(tree => {
 // ----------------------------------------
 
 app.get("/", async(req, res) => {
+  await tree.buildTree();
+  let model = tree.returnTree();
   if (req.user) {
     let parent = await User.findById(req.user.parent);
-
-    res.render("home", { user: req.user, parent: parent });
+    let user = tree.getChildById(model, req.user._id.toString());
+    let chain = tree.countChildrenByLevel(user);
+    res.render("home", { user: user, parent: parent, levels: chain});
   } else {
     res.redirect("/login");
   }
@@ -212,10 +273,11 @@ app.post(
 // 4
 const ponzPointz = (ponzDist) => {
   let pointz = 40;
-  return (((Math.trunc(pointz * (0.5 ** ponzDist)))) || 1);
+  for (let i = 1; i < ponzDist; i++) {
+    pointz = parseInt(pointz / 2);
+  }
+  return pointz;
 }
-
-
 
 const rewardUsers = async(parentId) => {
   let distance = 1;
@@ -226,6 +288,7 @@ const rewardUsers = async(parentId) => {
     await parent.save();
     parent = await User.findById(parent.parent);
   }
+  await tree.buildTree();
 }
 
 const punishUsers = async(parentId) => {
@@ -237,12 +300,18 @@ const punishUsers = async(parentId) => {
     await parent.save();
     parent = await User.findById(parent.parent);
   }
+  await tree.buildTree();
 }
 
 app.post("/register", async function(req, res, next) {
   const { username, password } = req.body;
   const parentId = req.body.parentId;
-  const user = new User({ username, password, parent: parentId, points: 0 });
+  let user;
+  if (parentId) {
+    user = new User({username, password, parent: parentId, points: 0 });
+  } else {
+    user = new User({username, password, parent:"",  points:0});
+  }
   try {
     let savedUser = await user.save();
     let parent = await User.findById(savedUser.parent);
@@ -266,13 +335,10 @@ app.get("/logout", function(req, res) {
   res.redirect("/");
 });
 
-
-
 app.use('/', (req, res) => {
   req.flash('Hi!');
   res.render('welcome/index');
 });
-
 
 // ----------------------------------------
 // Template Engine

@@ -1,4 +1,9 @@
-    {{user.username}}
-    {{#each user.children as |user|}}
-        {{> shared/_children}}
+
+
+  <div class="ponz-mem">
+    <div class="ponz-pointz-box">${{user.points}}</div>
+    <p class="displayName">{{user.username}}</p>
+    {{#each user.children as |child|}}
+        {{> shared/_children user=child }}
     {{/each}}    
+  </div>
