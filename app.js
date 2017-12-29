@@ -1,5 +1,6 @@
 const express = require('express');
 const app = express();
+var Promise = require('bluebird');
 
 
 // ----------------------------------------
@@ -68,12 +69,10 @@ app.use((req, res, next) => {
   next();
 });
 
-
 // ----------------------------------------
 // Public
 // ----------------------------------------
 app.use(express.static(`${__dirname}/public`));
-
 
 // ----------------------------------------
 // Logging
@@ -82,7 +81,6 @@ const morgan = require('morgan');
 const morganToolkit = require('morgan-toolkit')(morgan);
 
 app.use(morganToolkit());
-
 
 // ----------------------------------------
 // Passport
@@ -121,15 +119,24 @@ passport.deserializeUser(function(id, done) {
 });
 
 // ---------------------------------------------------------
-// Redis 
-// 2017-12-13 13:46
+// Redis
+// 2017-12-29 08:23
 // ---------------------------------------------------------
 
+const redis = require('redis');
+Promise.promisifyAll(redis);
+const redisClient = redis.createClient();
 
-//----------------------------------
-//Build Redis Tree Section
-//Only do if tree in redis does not exist
-//--------------------------------------
+// ---------------------------------------------------------
+// Tree controller class  
+// 2017-12-14 22:21
+// ---------------------------------------------------------
+// Creates and stores a tree of nested objects drawn from
+// MongoDB with .buildTree()
+//
+// Provides methods for recursively counting levels of this
+// tree, fetching specific nodes, and updating nodes.
+
 class TreeController {
   constructor() {
     this.tree;
@@ -150,6 +157,7 @@ class TreeController {
       }
     }
   }
+
   countChildrenByLevel(node) {
     let returnArr = [];
     this._countLevel(node, 0, returnArr);
@@ -204,7 +212,17 @@ class TreeController {
   }
 }
 
-let tree = new TreeController();
+// This isn't as cool as you think it is; an IFFE with an 'await' inside of it 
+// is still just another asynchronous function; by placing it outside your
+// route handlers, you merely ensure that the tree will PROBABLY load by the  
+// time you need it.
+
+(async () => {
+  tree = new TreeController(); // Intentional global variable
+  await tree.buildTree();
+  console.log("tree.returnTree(): ", JSON.stringify(tree.returnTree(), null, 2));
+})();
+
 //tree.buildTree().then(() => {
   //let model = tree.returnTree();
   //console.log(JSON.stringify(model, null, 2));
@@ -214,9 +232,6 @@ let tree = new TreeController();
   ////Save tree to redis here
   ////-------------------
 //});
-
-
-
 
 //const redisClient = require('redis').createClient();
 //let tree = {
@@ -235,7 +250,6 @@ let tree = new TreeController();
 // ----------------------------------------
 
 app.get("/", async(req, res) => {
-  await tree.buildTree();
   let model = tree.returnTree();
   if (req.user) {
     let parent = await User.findById(req.user.parent);
