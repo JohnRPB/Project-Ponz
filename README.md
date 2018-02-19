@@ -12,5 +12,7 @@ The pyramid on the main page has a dynamic number of levels, and displays how ma
 
 * [Node.js](https://nodejs.org/en/) - JavaScript runtime
 * [Express](https://expressjs.com/) - Server architecture 
+* [Handlebars](https://handlebarsjs.com/) - Server-based dynamic templating
 * [Redis](https://redis.io/) - NoSQL database
+
 
